@@ -1,0 +1,11 @@
+.codex
+.pytest_cache/
+.venv/
+__pycache__/
+*.egg-info/
+*.pyc
+*.pyo
+*.rar
+build/
+dist/
+
