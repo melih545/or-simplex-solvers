@@ -1,6 +1,7 @@
 """Public package interface for simplex_codes."""
 
 from ._result import SolverResult
+from ._two_phase import solve
 from .big_m import big_m_method
 from .dual_simplex import dual_simplex
 from .revised_simplex import revised_simplex
@@ -12,6 +13,7 @@ __all__ = [
     "dual_simplex",
     "revised_simplex",
     "simplex",
+    "solve",
 ]
 
 __version__ = "0.1.0"

@@ -6,6 +6,7 @@ The project is intentionally lightweight and GitHub-focused: it is installable, 
 
 ## Supported Solvers
 
+- Two-phase simplex for LPs in their original variables
 - Primal simplex
 - Dual simplex
 - Revised simplex
@@ -27,6 +28,38 @@ python -m pip install -e ".[viz]"
 
 ## Quick Start
 
+Pass the objective coefficients as written in the problem. This example
+maximizes `8x + 5y` with two upper constraints and nonnegative variables.
+
+```python
+from simplex_codes import solve
+
+result = solve(
+    c=[8, 5],
+    A=[[1, 1], [9, 5]],
+    b=[6, 45],
+    sense="max",
+)
+
+print(result.solution)         # [3.75 2.25]
+print(result.objective_value)  # 41.25
+```
+
+`solve` defaults to minimization and treats every row as `<=`. Pass
+`constraint_senses` with one `<=`, `>=`, or `=` per row to mix constraint
+types. Variables default to `(0, None)`. To set bounds explicitly, pass one
+`(lower, upper)` pair per variable. `None` means there is no bound on that
+side, so `(None, None)` is a free variable and `(2, 2)` fixes a variable to 2.
+Use `A=[]` and `b=[]` for a problem with only variable bounds.
+
+The solver returns values for the original variables. It raises `ValueError`
+for infeasible or unbounded problems and `RuntimeError` when the pivot budget
+(`max_iterations`, default 10,000) is exhausted.
+
+### Tableau API
+
+Use the original methods to work directly with a tableau.
+
 ```python
 from simplex_codes import simplex
 
@@ -47,7 +80,7 @@ print(result.iterations)
 
 ## Input Format
 
-The solvers currently expect coefficient arrays in tableau-friendly form.
+The low-level methods expect coefficient arrays in tableau-friendly form.
 
 - `c` must include every variable coefficient already aligned with the constraint matrix columns.
 - Slack, surplus, or artificial variable columns should already be present in `A` and `c`.
@@ -77,7 +110,7 @@ Runnable examples live in [`examples/`](examples/):
 
 ## Limitations
 
-- Inputs are assumed to already be in a canonical matrix form.
+- The low-level methods assume inputs are already in a canonical matrix form.
 - The implementations are educational and do not yet cover every degeneracy or infeasibility edge case.
 - The visualization helper is only designed for 2D simplex paths.
 
