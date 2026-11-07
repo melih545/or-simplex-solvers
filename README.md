@@ -56,6 +56,23 @@ The solver returns values for the original variables. It raises `ValueError`
 for infeasible or unbounded problems and `RuntimeError` when the pivot budget
 (`max_iterations`, default 10,000) is exhausted.
 
+### Local workbench
+
+Run the workbench and open the printed loopback URL in your browser.
+The example model is already filled in. Edit the objective, variable bounds,
+and constraints, then select **Modeli çöz** to see the solution and both
+phases of the pivot trace. Two-variable models also show the feasible region
+and the pivot path when the visualization extra is installed.
+
+```bash
+python3 -m pip install -e ".[viz]"
+python3 -m simplex_codes._app
+```
+
+Open `http://127.0.0.1:8765` while the server is running. The installed
+`simplex-app` command also starts it. Use `--port` to change the port
+and press Ctrl+C to stop the server.
+
 ### Production planning and pivot visualization
 
 A workshop earns 8 units of profit per table and 5 per chair. Each product

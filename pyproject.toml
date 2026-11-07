@@ -26,6 +26,7 @@ classifiers = [
 
 [project.scripts]
 simplex-solve = "simplex_codes._cli:main"
+simplex-app = "simplex_codes._app:main"
 
 [project.optional-dependencies]
 compare = ["scipy>=1.10"]
@@ -44,6 +45,9 @@ version = { attr = "simplex_codes._version.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+simplex_codes = ["_web/*.html", "_web/*.css", "_web/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

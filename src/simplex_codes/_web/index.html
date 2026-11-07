@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simplex Workbench</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="shell">
+      <p class="eyebrow">DOĞRUSAL PROGRAMLAMA</p>
+      <h1>Simplex Workbench</h1>
+      <p>Modelini kur, çözümü bul ve simplex adımlarını incele.</p>
+    </div>
+  </header>
+  <main class="shell workspace">
+    <form id="model" class="panel">
+      <header class="panel-head">
+        <div><p class="eyebrow">01 · GİRDİ</p><h2>Problem modeli</h2></div>
+        <button id="example" class="secondary" type="button">Örneği yükle</button>
+      </header>
+      <fieldset>
+        <legend>Amaç fonksiyonu</legend>
+        <label class="sense">Yön
+          <select id="sense"><option value="max">Maksimize et</option><option value="min">Minimize et</option></select>
+        </label>
+        <p class="help">Her değişkenin amaç katsayısını ve varsa sınırlarını gir. Boş sınır, o tarafı serbest bırakır.</p>
+        <div class="table-scroll">
+          <table aria-label="Değişkenler ve amaç katsayıları">
+            <thead><tr><th>Değişken</th><th>Katsayı</th><th>Alt sınır</th><th>Üst sınır</th><th><span class="sr-only">İşlem</span></th></tr></thead>
+            <tbody id="variables"></tbody>
+          </table>
+        </div>
+        <button id="add-variable" class="secondary add" type="button">+ Değişken ekle</button>
+      </fieldset>
+      <fieldset>
+        <legend>Kısıtlar</legend>
+        <p class="help">Her satırda değişken katsayılarını, ilişkiyi ve sağ taraf değerini gir.</p>
+        <div class="table-scroll">
+          <table aria-label="Problem kısıtları">
+            <thead id="constraint-head"></thead>
+            <tbody id="constraints"></tbody>
+          </table>
+        </div>
+        <button id="add-constraint" class="secondary add" type="button">+ Kısıt ekle</button>
+      </fieldset>
+      <button id="solve" class="primary" type="submit">Modeli çöz <span aria-hidden="true">→</span></button>
+      <p id="error" class="error" role="alert" hidden></p>
+    </form>
+    <section class="panel results" aria-labelledby="result-heading">
+      <header class="panel-head">
+        <div><p class="eyebrow">02 · ÇIKTI</p><h2 id="result-heading">Çözüm ve süreç</h2></div>
+        <span id="status" class="status" role="status">Çözüme hazır</span>
+      </header>
+      <p id="placeholder" class="empty">Soldaki örneği çözebilir veya kendi modelini girebilirsin.</p>
+      <div id="report" hidden>
+        <dl id="metrics" class="metrics"></dl>
+        <h3>Değişken değerleri</h3>
+        <dl id="values" class="values"></dl>
+        <h3>Çözüm yolu</h3>
+        <p id="chart-note" class="help"></p>
+        <img id="chart" alt="Uygun bölge ve numaralı simplex adımları" hidden>
+        <h3>Pivot adımları</h3>
+        <p class="help">Faz 1 uygun bir baz arar. Faz 2 amaç fonksiyonunu optimize eder. Giren ve çıkan sütunlar standart formdaki sıra numaralarıyla gösterilir.</p>
+        <div class="table-scroll trace">
+          <table aria-label="Simplex pivot adımları">
+            <thead><tr><th>Adım</th><th>Faz</th><th>Giren</th><th>Çıkan</th><th>Nokta</th><th>Amaç</th></tr></thead>
+            <tbody id="steps"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
