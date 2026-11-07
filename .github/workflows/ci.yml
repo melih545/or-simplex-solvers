@@ -8,16 +8,33 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install package
-        run: python -m pip install --upgrade pip && python -m pip install -e .
+      - name: Build wheel
+        run: |
+          python -m pip install build
+          python -m build --wheel
+      - name: Install wheel with development and visualization extras
+        run: |
+          wheels=(dist/*.whl)
+          python -m pip install "${wheels[0]}[dev,viz]"
       - name: Run tests
         run: python -m pytest
+      - name: Run installed-package examples
+        working-directory: ${{ runner.temp }}
+        env:
+          MPLBACKEND: Agg
+        run: |
+          for example in "$GITHUB_WORKSPACE"/examples/*_example.py; do
+            python "$example"
+          done
+          python "$GITHUB_WORKSPACE/examples/simplex_visualization.py"
+          test -s simplex-path.png
 

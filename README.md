@@ -1,4 +1,4 @@
-# Simplex Codes
+# OR Simplex Solvers
 
 `simplex_codes` is a small Python package that collects a few simplex-based linear programming routines in a cleaner, reusable repository layout.
 
@@ -116,14 +116,20 @@ Runnable examples live in [`examples/`](examples/):
 
 ## Development
 
-Run the test suite:
+Install the development dependencies, run the test suite, and build the wheel.
 
 ```bash
+python -m pip install -e ".[dev,viz]"
 python -m pytest
+python -m build --wheel
 ```
 
-If you are working in an offline environment with the required build tools already installed, use:
+CI builds and installs the wheel before running tests and examples on Python
+3.10 through 3.14.
+
+For an offline editable installation, install the required dependencies in
+advance and run the following command.
 
 ```bash
-python -m pip install --no-build-isolation -e .
+python -m pip install --no-build-isolation -e ".[dev,viz]"
 ```

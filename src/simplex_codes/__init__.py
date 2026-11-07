@@ -2,6 +2,7 @@
 
 from ._result import SolverResult
 from ._two_phase import solve
+from ._version import __version__ as __version__
 from .big_m import big_m_method
 from .dual_simplex import dual_simplex
 from .revised_simplex import revised_simplex
@@ -15,6 +16,4 @@ __all__ = [
     "simplex",
     "solve",
 ]
-
-__version__ = "0.1.0"
 

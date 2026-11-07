@@ -2,13 +2,14 @@
 
 import builtins
 import importlib
+from importlib.metadata import version
 
 import pytest
 
 
 def test_package_import_smoke():
     package = importlib.import_module("simplex_codes")
-    assert package.__version__ == "0.1.0"
+    assert package.__version__ == version("simplex-codes")
 
 
 def test_visualization_module_import_smoke():
