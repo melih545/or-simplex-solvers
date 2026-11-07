@@ -24,6 +24,9 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Mathematics",
 ]
 
+[project.scripts]
+simplex-solve = "simplex_codes._cli:main"
+
 [project.optional-dependencies]
 dev = ["build>=1.2", "pytest>=8"]
 viz = ["matplotlib>=3.8"]

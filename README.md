@@ -81,6 +81,31 @@ and leaving indices are zero-based standard-form columns, including slack,
 surplus, and artificial variables. Phase-one points may violate the original
 constraints while the algorithm searches for a feasible basis.
 
+### JSON command-line interface
+
+After installation, save a model such as the following in `model.json`.
+
+```json
+{
+  "c": [8, 5],
+  "A": [[1, 1], [9, 5]],
+  "b": [6, 45],
+  "sense": "max",
+  "constraint_senses": ["<=", "<="],
+  "bounds": [[0, null], [0, null]]
+}
+```
+
+```bash
+simplex-solve model.json
+python -m simplex_codes < model.json
+```
+
+The CLI requires `c`, `A`, and `b`. It uses the same defaults as `solve`
+and accepts an optional `max_iterations`. A successful run writes a JSON
+object with `solution`, `objective_value`, and `iterations` to standard output.
+Input and solver errors go to standard error with exit status 1.
+
 ### Tableau API
 
 Use the original methods to work directly with a tableau.

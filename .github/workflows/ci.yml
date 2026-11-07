@@ -27,6 +27,9 @@ jobs:
           python -m pip install "${wheels[0]}[dev,viz]"
       - name: Run tests
         run: python -m pytest
+      - name: Run the installed CLI
+        run: |
+          printf '%s\n' '{"c":[1],"A":[[1]],"b":[2],"sense":"max"}' | simplex-solve
       - name: Run installed-package examples
         working-directory: ${{ runner.temp }}
         env:
