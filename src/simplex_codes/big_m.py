@@ -6,18 +6,18 @@ import numpy as np
 
 from ._result import SolverResult
 from ._utils import (
-    BIG_M,
     EPSILON,
     as_float_matrix,
     as_float_vector,
     build_tableau,
     compute_objective_value,
     extract_basic_solution,
+    find_unit_basis,
     normalize_sense,
     pivot,
     validate_dimensions,
 )
-from .simplex import _can_be_improved, _get_pivot_position
+from .simplex import _get_leaving_row
 
 
 def big_m_method(
@@ -27,7 +27,7 @@ def big_m_method(
     sense: str,
     artificial_count: int,
 ) -> SolverResult:
-    """Solve a tableau-ready LP with a Big-M style initialization."""
+    """Solve a tableau-ready LP with a symbolic Big-M penalty."""
 
     c_array = as_float_vector(c, "c")
     A_array = as_float_matrix(A, "A")
@@ -38,59 +38,44 @@ def big_m_method(
     if artificial_count <= 0 or artificial_count > c_array.size:
         raise ValueError("artificial_count must be between 1 and the number of variables.")
 
-    tableau = _add_penalties(c_array, A_array, b_array, sense=sense, artificial_count=artificial_count)
-    artificial_indices = np.arange(c_array.size - artificial_count, c_array.size)
+    if np.any(b_array < -EPSILON):
+        raise ValueError("Big-M requires a primal feasible initial tableau.")
+
+    first_artificial = c_array.size - artificial_count
+    column_order = [*range(first_artificial, c_array.size), *range(first_artificial)]
+    basis = find_unit_basis(A_array, column_order)
+
+    # The leading row stores the coefficient of the symbolic penalty M.
+    # Minimize that coefficient before improving the ordinary objective.
+    penalty_row = np.zeros(c_array.size + 1)
+    penalty_row[first_artificial:-1] = 1.0
+    tableau = np.vstack([penalty_row, build_tableau(c_array, A_array, b_array)])
+    tableau[:2] -= tableau[:2, basis] @ tableau[2:]
+
     iterations = 0
+    while True:
+        penalties = tableau[0, :-1]
+        if np.any(penalties < -EPSILON):
+            pivot_column = int(np.argmin(penalties))
+        else:
+            if tableau[0, -1] < -EPSILON:
+                raise ValueError("The linear program is infeasible: artificial variables remain positive.")
 
-    for _ in range(artificial_count):
-        pivot_row, pivot_column = _get_cleanup_pivot_position(tableau, artificial_indices)
-        tableau = pivot(tableau, pivot_row, pivot_column)
+            costs = tableau[1, :-1] if sense == "max" else -tableau[1, :-1]
+            costs = np.where(np.abs(penalties) <= EPSILON, costs, np.inf)
+            if not np.any(costs < -EPSILON):
+                break
+            pivot_column = int(np.argmin(costs))
+
+        pivot_row = _get_leaving_row(tableau[1:], pivot_column)
+        tableau = pivot(tableau, pivot_row + 1, pivot_column)
+        basis[pivot_row - 1] = pivot_column
         iterations += 1
 
-    while _can_be_improved(tableau, sense):
-        pivot_row, pivot_column = _get_pivot_position(tableau, sense)
-        tableau = pivot(tableau, pivot_row, pivot_column)
-        iterations += 1
-
-    solution = extract_basic_solution(tableau, c_array.size)
+    solution = extract_basic_solution(tableau[1:], basis)
     return SolverResult(
         solution=solution,
         objective_value=compute_objective_value(c_array, solution, sense=sense),
         iterations=iterations,
     )
-
-
-def _add_penalties(
-    c: np.ndarray,
-    A: np.ndarray,
-    b: np.ndarray,
-    *,
-    sense: str,
-    artificial_count: int,
-) -> np.ndarray:
-    tableau = build_tableau(c, A, b)
-    penalty = BIG_M if sense == "max" else -BIG_M
-    tableau[0, -artificial_count - 1 : -1] = penalty
-    return tableau
-
-
-def _get_cleanup_pivot_position(tableau: np.ndarray, artificial_indices: np.ndarray) -> tuple[int, int]:
-    objective_row = tableau[0, :-1].copy()
-
-    for _ in range(objective_row.size):
-        pivot_column = int(np.argmin(objective_row))
-        if pivot_column not in artificial_indices:
-            break
-        objective_row[pivot_column] = 0.0
-    else:
-        raise ValueError("Big-M cleanup found no non-artificial entering column.")
-
-    column = tableau[1:, pivot_column]
-    rhs = tableau[1:, -1]
-    ratios = np.where(column > EPSILON, rhs / column, np.inf)
-    if np.isinf(ratios).all():
-        raise ValueError("Big-M cleanup found no valid leaving row.")
-
-    pivot_row = int(np.argmin(ratios)) + 1
-    return pivot_row, pivot_column
 

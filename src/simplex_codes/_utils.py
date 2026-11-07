@@ -7,7 +7,6 @@ from typing import Iterable
 import numpy as np
 
 EPSILON = 1e-9
-BIG_M = 10_000.0
 
 
 def as_float_vector(values: Iterable[float], name: str) -> np.ndarray:
@@ -49,7 +48,7 @@ def build_tableau(
     return np.vstack([objective_row, constraints]).astype(float)
 
 
-def pivot(tableau: np.ndarray, row: int, column: int) -> np.ndarray:
+def pivot(tableau: np.ndarray, row: int, column: int, *, zero_small: bool = True) -> np.ndarray:
     updated = tableau.copy()
     pivot_value = updated[row, column]
     if np.isclose(pivot_value, 0.0, atol=EPSILON):
@@ -61,30 +60,33 @@ def pivot(tableau: np.ndarray, row: int, column: int) -> np.ndarray:
             continue
         updated[current_row] = updated[current_row] - updated[row] * updated[current_row, column]
 
-    updated[np.isclose(updated, 0.0, atol=EPSILON)] = 0.0
+    if zero_small:
+        updated[np.isclose(updated, 0.0, atol=EPSILON)] = 0.0
     return updated
 
 
-def extract_basic_solution(tableau: np.ndarray, variable_count: int) -> np.ndarray:
-    solution = np.zeros(variable_count, dtype=float)
+def find_unit_basis(A: np.ndarray, columns: Iterable[int]) -> np.ndarray:
+    """Find one unit column per row, in order of column preference."""
+    basis = np.full(A.shape[0], -1, dtype=int)
+    for column_index in columns:
+        column = A[:, column_index]
+        nonzero_rows = np.flatnonzero(np.abs(column) > EPSILON)
+        if nonzero_rows.size == 1:
+            row = nonzero_rows[0]
+            if basis[row] == -1 and np.isclose(column[row], 1.0, atol=EPSILON, rtol=0):
+                basis[row] = column_index
+    if np.any(basis == -1):
+        raise ValueError("The initial tableau must contain a unit basis.")
+    return basis
 
-    for column_index in range(variable_count):
-        column = tableau[:, column_index]
-        if not np.isclose(column[0], 0.0, atol=EPSILON):
-            continue
 
-        constraint_column = column[1:]
-        pivot_rows = np.where(np.isclose(constraint_column, 1.0, atol=EPSILON))[0]
-        if pivot_rows.size != 1:
-            continue
-
-        pivot_row = pivot_rows[0]
-        if not np.all(np.isclose(np.delete(constraint_column, pivot_row), 0.0, atol=EPSILON)):
-            continue
-
-        solution[column_index] = tableau[pivot_row + 1, -1]
-
-    solution[np.isclose(solution, 0.0, atol=EPSILON)] = 0.0
+def extract_basic_solution(
+    tableau: np.ndarray, basis: np.ndarray, *, zero_small: bool = True,
+) -> np.ndarray:
+    solution = np.zeros(tableau.shape[1] - 1, dtype=float)
+    solution[basis] = tableau[1:, -1]
+    if zero_small:
+        solution[np.isclose(solution, 0.0, atol=EPSILON)] = 0.0
     return solution
 
 

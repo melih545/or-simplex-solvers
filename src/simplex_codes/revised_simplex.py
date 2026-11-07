@@ -25,6 +25,8 @@ def revised_simplex(
     basis = [int(index) for index in basic_indices]
     nonbasis = [int(index) for index in nonbasic_indices]
     _validate_partition(c_array.size, basis, nonbasis)
+    if len(basis) != A_array.shape[0]:
+        raise ValueError("The basis must contain one column per constraint.")
 
     iterations = 0
     while True:
@@ -33,11 +35,19 @@ def revised_simplex(
         basis_costs = c_array[basis]
         nonbasis_costs = c_array[nonbasis]
 
-        basis_inverse = np.linalg.inv(basis_matrix)
-        reduced_costs = basis_costs @ basis_inverse @ nonbasis_matrix - nonbasis_costs
+        try:
+            basic_values = np.linalg.solve(basis_matrix, b_array)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("The basis matrix is singular.") from exc
+        if np.any(basic_values < -EPSILON):
+            if iterations == 0:
+                raise ValueError("The initial basis must be primal feasible.")
+            raise ValueError("The basis lost primal feasibility during iteration.")
+
+        dual_values = np.linalg.solve(basis_matrix.T, basis_costs)
+        reduced_costs = dual_values @ nonbasis_matrix - nonbasis_costs
 
         if np.all(reduced_costs >= -EPSILON):
-            basic_values = basis_inverse @ b_array
             solution = np.zeros(c_array.size, dtype=float)
             solution[basis] = basic_values
             solution[np.isclose(solution, 0.0, atol=EPSILON)] = 0.0
@@ -50,9 +60,9 @@ def revised_simplex(
         entering_position = int(np.argmin(reduced_costs))
         entering_variable = nonbasis[entering_position]
 
-        direction = basis_inverse @ A_array[:, entering_variable]
-        basic_values = basis_inverse @ b_array
-        ratios = np.where(direction > EPSILON, basic_values / direction, np.inf)
+        direction = np.linalg.solve(basis_matrix, A_array[:, entering_variable])
+        ratios = np.full_like(basic_values, np.inf)
+        np.divide(basic_values, direction, out=ratios, where=direction > EPSILON)
         if np.isinf(ratios).all():
             raise ValueError("Revised simplex found an unbounded entering direction.")
 

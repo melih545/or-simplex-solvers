@@ -12,6 +12,7 @@ from ._utils import (
     build_tableau,
     compute_objective_value,
     extract_basic_solution,
+    find_unit_basis,
     pivot,
     validate_dimensions,
 )
@@ -31,14 +32,16 @@ def dual_simplex(
     validate_dimensions(c_array, A_array, b_array)
 
     tableau = build_tableau(c_array, A_array, b_array, objective_offset=objective_offset)
+    basis = find_unit_basis(A_array, np.flatnonzero(np.abs(c_array) <= EPSILON))
     iterations = 0
 
     while np.any(tableau[1:, -1] < -EPSILON):
         pivot_row, pivot_column = _get_pivot_position(tableau)
         tableau = pivot(tableau, pivot_row, pivot_column)
+        basis[pivot_row - 1] = pivot_column
         iterations += 1
 
-    solution = extract_basic_solution(tableau, c_array.size)
+    solution = extract_basic_solution(tableau, basis)
     return SolverResult(
         solution=solution,
         objective_value=compute_objective_value(c_array, solution, offset=objective_offset),

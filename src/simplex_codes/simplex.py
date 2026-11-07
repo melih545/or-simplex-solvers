@@ -12,6 +12,7 @@ from ._utils import (
     build_tableau,
     compute_objective_value,
     extract_basic_solution,
+    find_unit_basis,
     normalize_sense,
     pivot,
     validate_dimensions,
@@ -45,18 +46,20 @@ def _solve_simplex(
     sense = normalize_sense(sense)
 
     tableau = build_tableau(c_array, A_array, b_array)
-    trajectory = [extract_basic_solution(tableau, c_array.size)[:2]] if record_trajectory else []
+    basis = find_unit_basis(A_array, np.flatnonzero(np.abs(c_array) <= EPSILON))
+    trajectory = [extract_basic_solution(tableau, basis)[:2]] if record_trajectory else []
     iterations = 0
 
     while _can_be_improved(tableau, sense):
         pivot_row, pivot_column = _get_pivot_position(tableau, sense)
         tableau = pivot(tableau, pivot_row, pivot_column)
+        basis[pivot_row - 1] = pivot_column
         iterations += 1
 
         if record_trajectory:
-            trajectory.append(extract_basic_solution(tableau, c_array.size)[:2])
+            trajectory.append(extract_basic_solution(tableau, basis)[:2])
 
-    solution = extract_basic_solution(tableau, c_array.size)
+    solution = extract_basic_solution(tableau, basis)
     result = SolverResult(
         solution=solution,
         objective_value=compute_objective_value(c_array, solution, sense=sense),
@@ -79,12 +82,22 @@ def _get_pivot_position(tableau: np.ndarray, sense: str) -> tuple[int, int]:
     else:
         pivot_column = int(np.argmax(objective_row))
 
+    return _get_leaving_row(tableau, pivot_column), pivot_column
+
+
+def _get_leaving_row(
+    tableau: np.ndarray, pivot_column: int, *, basis: np.ndarray | None = None,
+) -> int:
     column = tableau[1:, pivot_column]
     rhs = tableau[1:, -1]
-    ratios = np.where(column > EPSILON, rhs / column, np.inf)
+    ratios = np.full_like(rhs, np.inf)
+    np.divide(rhs, column, out=ratios, where=column > EPSILON)
     if np.isinf(ratios).all():
         raise ValueError("The linear program is unbounded for the current tableau.")
 
-    pivot_row = int(np.argmin(ratios)) + 1
-    return pivot_row, pivot_column
+    row = int(np.argmin(ratios))
+    if basis is not None:
+        tied_rows = np.flatnonzero(ratios == ratios[row])
+        row = int(tied_rows[np.argmin(basis[tied_rows])])
+    return row + 1
 
