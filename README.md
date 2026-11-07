@@ -83,7 +83,8 @@ constraints while the algorithm searches for a feasible basis.
 
 ### JSON command-line interface
 
-After installation, save a model such as the following in `model.json`.
+After installation, use [the example model](examples/production_plan.json)
+or save a model such as the following in `model.json`.
 
 ```json
 {
