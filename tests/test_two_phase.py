@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from simplex_codes import solve
+from simplex_codes import PivotStep, solve
 
 
 def test_solve_maximizes_with_natural_costs_and_default_constraints():
@@ -86,6 +86,22 @@ def test_solve_detects_unboundedness_after_phase_one():
 def test_solve_shares_iteration_budget_between_phases():
     with pytest.raises(RuntimeError, match="iteration limit"):
         solve([-1], [[1]], [1], [">="], bounds=[(0, 2)], max_iterations=1)
+
+
+def test_solve_reports_original_coordinates_and_basis_changes_in_both_phases():
+    steps: list[PivotStep] = []
+    result = solve(
+        [3], [[1]], [2], [">="],
+        sense="max", bounds=[(1, 4)], on_step=steps.append,
+    )
+
+    assert steps == [
+        PivotStep(0, 1, None, None, (1.0,), 3.0),
+        PivotStep(1, 1, 0, 3, (2.0,), 6.0),
+        PivotStep(2, 2, 1, 2, (4.0,), 12.0),
+    ]
+    np.testing.assert_allclose(result.solution, steps[-1].solution)
+    assert result.iterations == steps[-1].iteration
 
 
 @pytest.mark.parametrize(

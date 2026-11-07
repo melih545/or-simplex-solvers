@@ -56,6 +56,31 @@ The solver returns values for the original variables. It raises `ValueError`
 for infeasible or unbounded problems and `RuntimeError` when the pivot budget
 (`max_iterations`, default 10,000) is exhausted.
 
+### Production planning and pivot visualization
+
+A workshop earns 8 units of profit per table and 5 per chair. Each product
+uses one storage slot, and there are 6 slots available. A table requires
+9 labor hours, a chair requires 5, and the workshop has 45 hours available.
+With table and chair quantities `x` and `y`, the model maximizes `8x + 5y`
+subject to `x + y <= 6`, `9x + 5y <= 45`, and `x, y >= 0`.
+
+The continuous optimum is 3.75 tables and 2.25 chairs for a profit of 41.25.
+The demo prints the entering and leaving variables at each pivot and saves
+`simplex-path.png` with the feasible region, constraint lines, and numbered
+pivots. Run it from the repository root after installing the visualization extra.
+
+```bash
+python examples/simplex_visualization.py
+```
+
+To collect the same trace from your own code, pass `on_step=steps.append` to
+`solve`, where `steps` is an empty list. It receives an immutable
+`PivotStep` at the initial basis and after each pivot. The solution and
+objective use the original problem's coordinates and coefficients. Entering
+and leaving indices are zero-based standard-form columns, including slack,
+surplus, and artificial variables. Phase-one points may violate the original
+constraints while the algorithm searches for a feasible basis.
+
 ### Tableau API
 
 Use the original methods to work directly with a tableau.

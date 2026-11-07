@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from numbers import Integral
 
 import numpy as np
@@ -22,6 +23,21 @@ from ._utils import (
 from .simplex import _get_leaving_row
 
 
+@dataclass(frozen=True, slots=True)
+class PivotStep:
+    """An immutable snapshot of a two-phase simplex basis."""
+
+    iteration: int
+    phase: int
+    entering: int | None
+    leaving: int | None
+    solution: tuple[float, ...]
+    objective_value: float
+
+
+_Trace = Callable[[np.ndarray, np.ndarray, int, int, int | None, int | None], None]
+
+
 def solve(
     c: ArrayLike,
     A: ArrayLike,
@@ -31,12 +47,18 @@ def solve(
     sense: str = "min",
     bounds: Sequence[tuple[float | None, float | None]] | None = None,
     max_iterations: int = 10_000,
+    on_step: Callable[[PivotStep], None] | None = None,
 ) -> SolverResult:
     """Optimize c @ x subject to row constraints and variable bounds.
 
     Rows default to "<=". Variables default to [0, +inf); a None bound
     endpoint leaves that side unbounded. The result uses the original
     variables and counts pivots in both phases, including basis cleanup.
+
+    Pass on_step to receive the initial basis and each subsequent pivot.
+    Entering and leaving indices refer to zero-based standard-form columns.
+    Snapshots always report the original objective and variables. Phase-one
+    snapshots may be infeasible for the original constraints.
 
     Raises ValueError for invalid, infeasible, or unbounded problems and
     RuntimeError when the pivot budget is exhausted.
@@ -101,16 +123,36 @@ def solve(
     if sense == "max":
         transformed_costs = -transformed_costs
 
+    def original_solution(values: np.ndarray) -> np.ndarray:
+        solution = shift.copy()
+        np.add.at(solution, columns, np.asarray(signs) * values)
+        return solution
+
+    trace: _Trace | None = None
+    if on_step is not None:
+        callback = on_step
+
+        def record_step(tableau, basis, iteration, phase, entering, leaving):
+            values = extract_basic_solution(tableau, basis, zero_small=False)
+            solution = original_solution(values[:len(columns)])
+            callback(PivotStep(
+                iteration, phase, entering, leaving,
+                tuple(solution.tolist()), float(costs @ solution),
+            ))
+
+        trace = record_step
+
     values, iterations = _solve_standard_form(
-        constraints, rhs, relations, transformed_costs, max_iterations,
+        constraints, rhs, relations, transformed_costs, max_iterations, trace,
     )
 
-    np.add.at(shift, columns, np.asarray(signs) * values)
-    return SolverResult(shift, float(costs @ shift), iterations)
+    solution = original_solution(values)
+    return SolverResult(solution, float(costs @ solution), iterations)
 
 
 def _solve_standard_form(
     A: np.ndarray, b: np.ndarray, relations: list[str], costs: np.ndarray, max_iterations: int,
+    trace: _Trace | None,
 ) -> tuple[np.ndarray, int]:
     # Make every RHS nonnegative before adding slack, surplus and artificial columns.
     for row in np.flatnonzero(b < 0):
@@ -136,7 +178,9 @@ def _solve_standard_form(
     phase_one_costs[first_artificial:] = 1.0
     tableau = build_tableau(phase_one_costs, standard, b)
     tableau[0] -= phase_one_costs[basis] @ tableau[1:]
-    tableau, iterations = _minimize(tableau, basis, 0, max_iterations)
+    if trace is not None:
+        trace(tableau, basis, 0, 1 if artificial_rows else 2, None, None)
+    tableau, iterations = _minimize(tableau, basis, 0, max_iterations, phase=1, trace=trace)
 
     artificial_basis = basis >= first_artificial
     if np.sum(tableau[1:, -1][artificial_basis]) > EPSILON:
@@ -155,6 +199,7 @@ def _solve_standard_form(
         tableau[row + 1, -1] = 0.0
         tableau, iterations = _take_step(
             tableau, basis, row + 1, int(entering[0]), iterations, max_iterations,
+            phase=1, trace=trace,
         )
 
     tableau = tableau[np.r_[True, keep_rows]]
@@ -166,13 +211,16 @@ def _solve_standard_form(
     tableau[0, :-1] = phase_two_costs
     tableau[0, -1] = 0.0
     tableau[0] -= phase_two_costs[basis] @ tableau[1:]
-    tableau, iterations = _minimize(tableau, basis, iterations, max_iterations)
+    tableau, iterations = _minimize(
+        tableau, basis, iterations, max_iterations, phase=2, trace=trace,
+    )
     solution = extract_basic_solution(tableau, basis, zero_small=False)
     return solution[:costs.size], iterations
 
 
 def _minimize(
     tableau: np.ndarray, basis: np.ndarray, iterations: int, max_iterations: int,
+    *, phase: int, trace: _Trace | None,
 ) -> tuple[np.ndarray, int]:
     while True:
         improving = tableau[0, :-1] < -EPSILON
@@ -184,14 +232,21 @@ def _minimize(
         # Bland's rule uses the smallest variable index to break pivot ties.
         column = int(entering[0])
         row = _get_leaving_row(tableau, column, basis=basis)
-        tableau, iterations = _take_step(tableau, basis, row, column, iterations, max_iterations)
+        tableau, iterations = _take_step(
+            tableau, basis, row, column, iterations, max_iterations, phase=phase, trace=trace,
+        )
 
 
 def _take_step(
     tableau: np.ndarray, basis: np.ndarray, row: int, column: int, iterations: int, max_iterations: int,
+    *, phase: int, trace: _Trace | None,
 ) -> tuple[np.ndarray, int]:
     if iterations >= max_iterations:
         raise RuntimeError("The simplex iteration limit was reached.")
     tableau = pivot(tableau, row, column, zero_small=False)
+    leaving = int(basis[row - 1])
     basis[row - 1] = column
-    return tableau, iterations + 1
+    iterations += 1
+    if trace is not None:
+        trace(tableau, basis, iterations, phase, column, leaving)
+    return tableau, iterations
