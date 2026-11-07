@@ -21,10 +21,10 @@ jobs:
         run: |
           python -m pip install build
           python -m build --wheel
-      - name: Install wheel with development and visualization extras
+      - name: Install wheel with test and example dependencies
         run: |
           wheels=(dist/*.whl)
-          python -m pip install "${wheels[0]}[dev,viz]"
+          python -m pip install "${wheels[0]}[compare,dev,viz]"
       - name: Run tests
         run: python -m pytest
       - name: Run the installed CLI

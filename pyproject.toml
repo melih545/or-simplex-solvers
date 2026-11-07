@@ -28,6 +28,7 @@ classifiers = [
 simplex-solve = "simplex_codes._cli:main"
 
 [project.optional-dependencies]
+compare = ["scipy>=1.10"]
 dev = ["build>=1.2", "pytest>=8"]
 viz = ["matplotlib>=3.8"]
 

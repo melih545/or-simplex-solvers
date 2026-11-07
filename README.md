@@ -147,6 +147,16 @@ Runnable examples live in [`examples/`](examples/):
 - [`revised_simplex_example.py`](examples/revised_simplex_example.py)
 - [`big_m_example.py`](examples/big_m_example.py)
 - [`simplex_visualization.py`](examples/simplex_visualization.py)
+- [`solver_comparison_example.py`](examples/solver_comparison_example.py)
+
+The comparison example solves the same production model with primal simplex,
+revised simplex, and SciPy/HiGHS. It checks that all three agree on the
+quantities and profit. Install the optional comparison dependency to run it.
+
+```bash
+python -m pip install -e ".[compare]"
+python examples/solver_comparison_example.py
+```
 
 ## Project Structure
 
@@ -169,7 +179,7 @@ Runnable examples live in [`examples/`](examples/):
 Install the development dependencies, run the test suite, and build the wheel.
 
 ```bash
-python -m pip install -e ".[dev,viz]"
+python -m pip install -e ".[compare,dev,viz]"
 python -m pytest
 python -m build --wheel
 ```
@@ -181,5 +191,5 @@ For an offline editable installation, install the required dependencies in
 advance and run the following command.
 
 ```bash
-python -m pip install --no-build-isolation -e ".[dev,viz]"
+python -m pip install --no-build-isolation -e ".[compare,dev,viz]"
 ```
