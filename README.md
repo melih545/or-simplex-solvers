@@ -179,6 +179,11 @@ python -m pip install -e ".[compare]"
 python examples/solver_comparison_example.py
 ```
 
+The HiGHS differential tests run in CI. For a reproducible benchmark with
+runtime, iteration count, objective value, and maximum primal violation, run
+`python3 benchmarks/benchmark_solvers.py --seed 247`. It writes CSV to standard
+output. Iteration counts depend on each solver's algorithm and presolve.
+
 ## Project Structure
 
 ```text
