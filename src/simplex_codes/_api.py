@@ -9,10 +9,12 @@ from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from ._charts import render_chart
+from ._observability import REGISTRY, measure_model
 from ._scenarios import compare_scenarios, read_production_csv
-from ._service import SolveOutcome, execute_model
+from ._service import SolveOutcome
 from ._version import __version__
 
 
@@ -104,10 +106,20 @@ class ModelSizeLimit:
 app.add_middleware(ModelSizeLimit)
 
 
+@app.get("/healthz")
+def health():
+    return {"status": "ok"}
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics() -> Response:
+    return Response(generate_latest(REGISTRY), headers={"Content-Type": CONTENT_TYPE_LATEST})
+
+
 @app.post("/api/v1/solve", response_model=ModelResponse, response_model_exclude_none=True,
           responses={422: {"model": SolveOutcome}, 413: {"model": SolveOutcome}})
 def solve_request(model: ModelRequest, response: Response, trace: bool = False, chart: bool = False):
-    outcome = execute_model(model.model_dump(), trace=trace or chart)
+    outcome = measure_model(model.model_dump(), trace=trace or chart)
     payload = asdict(outcome)
     if outcome.status == "invalid_model":
         response.status_code = 422
@@ -136,7 +148,7 @@ def import_production(data: ProductionCsv):
 @app.post("/api/v1/scenarios/compare")
 def compare_production(data: ScenarioRequest):
     try:
-        return compare_scenarios(data.csv, data.baseline, data.alternative)
+        return compare_scenarios(data.csv, data.baseline, data.alternative, run_model=measure_model)
     except ValueError as exc:
         return JSONResponse({"status": "invalid_model", "error": str(exc)}, status_code=422)
 

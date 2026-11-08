@@ -48,3 +48,17 @@ jobs:
           python "$GITHUB_WORKSPACE/examples/simplex_visualization.py"
           test -s simplex-path.png
 
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the workbench and monitoring stack
+        run: docker compose up --build --wait
+      - name: Verify the running stack
+        run: python3 scripts/smoke_stack.py
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop containers
+        if: always()
+        run: docker compose down

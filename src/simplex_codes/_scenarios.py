@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Callable
 from io import StringIO
 from math import isfinite
 
 from ._numerics import FEASIBILITY_TOLERANCE
-from ._service import execute_model
+from ._service import SolveOutcome, execute_model
 
 
 def read_production_csv(source: str) -> tuple[list[str], list[str], list[float], list[list[float]]]:
@@ -48,7 +49,10 @@ def read_production_csv(source: str) -> tuple[list[str], list[str], list[float],
     return products, resources, profits, usage
 
 
-def compare_scenarios(source: str, baseline: dict[str, float], alternative: dict[str, float]) -> dict:
+def compare_scenarios(
+    source: str, baseline: dict[str, float], alternative: dict[str, float], *,
+    run_model: Callable[[dict], SolveOutcome] = execute_model,
+) -> dict:
     products, resources, profits, usage = read_production_csv(source)
     A = [list(column) for column in zip(*usage)]
 
@@ -61,7 +65,7 @@ def compare_scenarios(source: str, baseline: dict[str, float], alternative: dict
     reports = []
     for capacities in (baseline, alternative):
         limits = [capacities[resource] for resource in resources]
-        outcome = execute_model({"c": profits, "A": A, "b": limits, "sense": "max"})
+        outcome = run_model({"c": profits, "A": A, "b": limits, "sense": "max"})
         report = {"status": outcome.status}
         if outcome.solution is None:
             report["error"] = outcome.error

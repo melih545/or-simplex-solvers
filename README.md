@@ -91,6 +91,27 @@ unit of each product. Enter the baseline and alternative capacity for each
 resource. The comparison shows profit, production quantities, resource usage
 and binding constraints, and can be downloaded as JSON.
 
+### Docker and monitoring
+
+```bash
+docker compose up --build --wait
+python3 scripts/smoke_stack.py
+docker compose down
+```
+
+The workbench listens on `http://127.0.0.1:8765`, Prometheus on
+`http://127.0.0.1:9090`, and the provisioned Grafana dashboard on
+`http://127.0.0.1:3000/d/simplex-overview`. The Compose stack is a local
+demo. Grafana grants anonymous viewer access on its loopback port.
+Override occupied host ports with `SIMPLEX_PORT`, `PROMETHEUS_PORT`, and
+`GRAFANA_PORT` in both the Compose and smoke-test environments.
+
+The API exposes `/healthz` and `/metrics`. Each solver attempt produces a
+JSON log with the outcome, duration, and iteration count. The dashboard
+tracks solve rate by status, p95 solve time, and the share of numerical
+failures. Malformed requests rejected before invoking the solver are outside
+these metrics.
+
 ### Production planning and pivot visualization
 
 A workshop earns 8 units of profit per table and 5 per chair. Each product

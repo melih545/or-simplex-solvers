@@ -1,0 +1,96 @@
+{
+  "uid": "simplex-overview",
+  "title": "Simplex Workbench",
+  "schemaVersion": 41,
+  "refresh": "10s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Solve attempts by outcome",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "simplex-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (rate(simplex_solve_attempts_total[1m]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Solve time (p95)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "simplex-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(simplex_solve_duration_seconds_bucket[1m])))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Numerical failure rate",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "simplex-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(simplex_solve_attempts_total{status=\"numerical_error\"}[1m])) / clamp_min(sum(rate(simplex_solve_attempts_total[1m])), 1e-9)",
+          "legendFormat": "numerical errors / attempts"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

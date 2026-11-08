@@ -123,3 +123,31 @@ def test_capacity_comparison_reports_unused_resources_and_unbounded_profit():
     }).json()
     assert unbounded["baseline"]["status"] == "unbounded"
     assert "profit_delta" not in unbounded
+
+
+def test_workbench_exposes_health_and_records_outcomes(caplog):
+    from prometheus_client.parser import text_string_to_metric_families
+
+    def attempt_counts():
+        scrape = request("GET", "/metrics")
+        assert scrape.status_code == 200
+        return {
+            sample.labels["status"]: sample.value
+            for family in text_string_to_metric_families(scrape.text)
+            for sample in family.samples
+            if sample.name == "simplex_solve_attempts_total" and sample.labels["solver"] == "two_phase"
+        }
+
+    assert request("GET", "/healthz").json() == {"status": "ok"}
+    before = attempt_counts()
+    with caplog.at_level("INFO", logger="simplex.solve"):
+        for model in (MODEL, {"c": [1], "A": [[1]], "b": [-1]},
+                      {"c": [1e308], "A": [[1]], "b": [2], "sense": "max"}):
+            request("POST", "/api/v1/solve", json=model)
+    after = attempt_counts()
+    statuses = ["optimal", "infeasible", "numerical_error"]
+    assert [after[status] - before[status] for status in statuses] == [1, 1, 1]
+    records = [json.loads(record.message) for record in caplog.records if record.name == "simplex.solve"]
+    assert [record["status"] for record in records] == statuses
+    assert all(record["duration_seconds"] >= 0 and "model" not in record for record in records)
+    assert "simplex_solve_duration_seconds_bucket" in request("GET", "/metrics").text
