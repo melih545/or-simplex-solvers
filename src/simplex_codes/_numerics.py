@@ -7,6 +7,9 @@ from collections.abc import Sequence
 import numpy as np
 
 
+from ._errors import NumericalError
+
+
 # Scaling puts nonzero row and objective norms near one. Use a tighter
 # roundoff threshold for pivot decisions than for checking primal feasibility.
 ROUNDOFF_TOLERANCE = 32 * np.finfo(float).eps
@@ -30,7 +33,7 @@ def scale_costs(costs: np.ndarray) -> np.ndarray:
 def _rescale(values: np.ndarray, exponents: np.ndarray | int) -> np.ndarray:
     scaled = np.ldexp(values, exponents)
     if np.any((values != 0) & (scaled == 0)):
-        raise RuntimeError("Numerical failure: scaling erased a nonzero coefficient.")
+        raise NumericalError("Numerical failure: scaling erased a nonzero coefficient.")
     return scaled
 
 
@@ -40,7 +43,7 @@ def verify_solution(
 ) -> None:
     """Check primal feasibility in the original coordinates and row senses."""
     if not np.isfinite(solution).all():
-        raise RuntimeError("Numerical failure: the solution is not finite.")
+        raise NumericalError("Numerical failure: the solution is not finite.")
 
     # Normalize independently of the tableau to avoid overflow and make the
     # residual test insensitive to a change in a constraint's units.
@@ -51,13 +54,13 @@ def verify_solution(
     for row, (residual, relation, tolerance) in enumerate(zip(residuals, relations, tolerances), start=1):
         violation = residual if relation == "<=" else -residual if relation == ">=" else abs(residual)
         if violation > tolerance:
-            raise RuntimeError(f"Numerical failure: solution violates original constraint {row}.")
+            raise NumericalError(f"Numerical failure: solution violates original constraint {row}.")
 
     for index, (value, (lower, upper)) in enumerate(zip(solution, bounds), start=1):
         below_lower = np.isfinite(lower) and lower - value > _bound_tolerance(value, lower)
         above_upper = np.isfinite(upper) and value - upper > _bound_tolerance(value, upper)
         if below_lower or above_upper:
-            raise RuntimeError(f"Numerical failure: solution violates original bounds for variable {index}.")
+            raise NumericalError(f"Numerical failure: solution violates original bounds for variable {index}.")
 
 
 def _bound_tolerance(value: float, bound: float) -> float:

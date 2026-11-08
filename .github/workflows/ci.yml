@@ -24,7 +24,7 @@ jobs:
       - name: Install wheel with test and example dependencies
         run: |
           wheels=(dist/*.whl)
-          python -m pip install "${wheels[0]}[compare,dev,viz]"
+          python -m pip install "${wheels[0]}[api,compare,dev,viz]"
       - name: Run tests
         run: python -m pytest
       - name: Run the installed CLI

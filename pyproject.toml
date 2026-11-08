@@ -29,8 +29,9 @@ simplex-solve = "simplex_codes._cli:main"
 simplex-app = "simplex_codes._app:main"
 
 [project.optional-dependencies]
+api = ["fastapi>=0.115", "pydantic>=2.10", "uvicorn>=0.32"]
 compare = ["scipy>=1.10"]
-dev = ["build>=1.2", "pytest>=8"]
+dev = ["build>=1.2", "httpx>=0.28", "pytest>=8"]
 viz = ["matplotlib>=3.8"]
 
 [project.urls]

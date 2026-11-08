@@ -202,16 +202,20 @@ form.addEventListener("submit", async (event) => {
     const invalidBound = model.bounds.findIndex(([lo, hi]) => lo !== null && hi !== null && lo > hi);
     if (invalidBound >= 0) throw new Error("x" + (invalidBound + 1) + " için alt sınır üst sınırı aşamaz.");
 
-    const response = await fetch("/solve", {
+    const response = await fetch("/api/v1/solve?trace=true&chart=true", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(model),
     });
     const result = await response.json();
-    if (!response.ok) {
-      if (result.error.includes("infeasible")) throw new Error("Bu kısıtları birlikte sağlayan bir çözüm yok.");
-      if (result.error.includes("unbounded")) throw new Error("Amaç değeri sınırsız. Kısıtları ve değişken sınırlarını kontrol et.");
-      throw new Error(result.error);
+    if (result.status !== "optimal") {
+      const messages = {
+        infeasible: "Bu kısıtları birlikte sağlayan bir çözüm yok.",
+        unbounded: "Amaç değeri sınırsız. Kısıtları ve değişken sınırlarını kontrol et.",
+        iteration_limit: "Çözücü pivot sınırına ulaştı.",
+        numerical_error: "Sonuç sayısal olarak doğrulanamadı. Modelin katsayı ölçeklerini kontrol et.",
+      };
+      throw new Error(messages[result.status] || result.error || "Çözüm isteği başarısız oldu.");
     }
     if (revision === version) showReport(result);
   } catch (error) {

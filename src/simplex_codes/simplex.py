@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ._errors import UnboundedError
 from ._result import SolverResult
 from ._utils import (
     EPSILON,
@@ -94,7 +95,7 @@ def _get_leaving_row(
     ratios = np.full_like(rhs, np.inf)
     np.divide(rhs, column, out=ratios, where=column > pivot_tolerance)
     if np.isinf(ratios).all():
-        raise ValueError("The linear program is unbounded for the current tableau.")
+        raise UnboundedError("The linear program is unbounded for the current tableau.")
 
     row = int(np.argmin(ratios))
     if basis is not None:

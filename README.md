@@ -68,13 +68,19 @@ phases of the pivot trace. Two-variable models also show the feasible region
 and the pivot path when the visualization extra is installed.
 
 ```bash
-python3 -m pip install -e ".[viz]"
+python3 -m pip install -e ".[api,viz]"
 python3 -m simplex_codes._app
 ```
 
 Open `http://127.0.0.1:8765` while the server is running. The installed
 `simplex-app` command also starts it. Use `--port` to change the port
 and press Ctrl+C to stop the server.
+
+The workbench also serves OpenAPI documentation at `/docs`. Send the same
+JSON model used by the CLI to `POST /api/v1/solve`. Use `?trace=true` to include
+pivots and `?chart=true` to request a chart for a two-variable model. Valid
+models return HTTP 200 with an explicit solve status, including mathematical
+and numerical failures. Invalid models return HTTP 422.
 
 ### Production planning and pivot visualization
 
@@ -126,6 +132,7 @@ The CLI requires `c`, `A`, and `b`. It uses the same defaults as `solve`
 and accepts an optional `max_iterations`. A successful run writes a JSON
 object with `solution`, `objective_value`, and `iterations` to standard output.
 Input and solver errors go to standard error with exit status 1.
+Pass `--structured` for the same JSON status contract as the HTTP API.
 
 ### Tableau API
 
@@ -205,7 +212,7 @@ output. Iteration counts depend on each solver's algorithm and presolve.
 Install the development dependencies, run the test suite, and build the wheel.
 
 ```bash
-python -m pip install -e ".[compare,dev,viz]"
+python -m pip install -e ".[api,compare,dev,viz]"
 python -m pytest
 python -m build --wheel
 ```
@@ -217,5 +224,5 @@ For an offline editable installation, install the required dependencies in
 advance and run the following command.
 
 ```bash
-python -m pip install --no-build-isolation -e ".[compare,dev,viz]"
+python -m pip install --no-build-isolation -e ".[api,compare,dev,viz]"
 ```
