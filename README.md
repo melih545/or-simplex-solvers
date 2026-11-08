@@ -53,8 +53,11 @@ side, so `(None, None)` is a free variable and `(2, 2)` fixes a variable to 2.
 Use `A=[]` and `b=[]` for a problem with only variable bounds.
 
 The solver returns values for the original variables. It raises `ValueError`
-for infeasible or unbounded problems and `RuntimeError` when the pivot budget
-(`max_iterations`, default 10,000) is exhausted.
+for infeasible or unbounded problems. It raises `RuntimeError` when the pivot
+budget (`max_iterations`, default 10,000) is exhausted or numerical accuracy
+prevents a verified result. The solver scales rows and objective coefficients
+internally and checks the returned solution against the original constraints
+and variable bounds.
 
 ### Local workbench
 

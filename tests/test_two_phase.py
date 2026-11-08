@@ -60,6 +60,65 @@ def test_solve_preserves_small_positive_variable_values():
     np.testing.assert_allclose(result.solution, [1e-10], atol=0)
 
 
+@pytest.mark.parametrize("scale", [1e-10, 1.0, 1e10])
+@pytest.mark.parametrize(("relation", "sense"), [("<=", "max"), ("=", "min"), (">=", "min")])
+def test_solve_is_invariant_to_positive_constraint_scaling(scale, relation, sense):
+    result = solve([1], [[scale]], [scale], [relation], sense=sense)
+
+    np.testing.assert_allclose(result.solution, [1])
+    assert result.objective_value == pytest.approx(1)
+
+
+def test_solve_preserves_original_objective_when_costs_are_small():
+    result = solve([1e-12], [[1]], [2], sense="max")
+
+    np.testing.assert_allclose(result.solution, [2])
+    assert result.objective_value == pytest.approx(2e-12, abs=0)
+
+
+def test_solve_does_not_ignore_a_small_pivot_in_a_mixed_scale_row():
+    result = solve([0, 1], [[1, 1e-10]], [1], sense="max")
+
+    np.testing.assert_allclose(result.solution, [0, 1e10])
+
+
+def test_solve_preserves_a_small_objective_coefficient_among_larger_costs():
+    result = solve([1, -1e-16], [[0, 1]], [2])
+
+    np.testing.assert_allclose(result.solution, [0, 2])
+    assert result.objective_value == pytest.approx(-2e-16, abs=0)
+
+
+def test_solve_does_not_report_unbounded_when_a_pivot_is_too_small():
+    with pytest.raises(RuntimeError, match="Numerical failure.*pivot"):
+        solve([0, 1], [[1, 1e-16]], [1], sense="max")
+
+
+def test_solve_checks_original_constraints_after_phase_one():
+    with pytest.raises(RuntimeError, match="original constraint"):
+        solve([0], [[1], [1]], [0, 1e-10], ["<=", ">="])
+
+
+def test_solve_detects_a_tiny_inconsistent_row_after_eliminating_a_fixed_variable():
+    with pytest.raises(ValueError, match="infeasible"):
+        solve([1], [[1e-10]], [2e-10], ["="], bounds=[(1, 1)])
+
+
+@pytest.mark.parametrize(("lower", "upper"), [(10, 11), (0, 1e-12)])
+def test_solve_verifies_bounds_in_original_coordinates(monkeypatch, lower, upper):
+    def candidate_outside_transformed_bounds(*args):
+        return np.array([2 * (upper - lower)]), 0
+
+    monkeypatch.setattr("simplex_codes._two_phase._solve_standard_form", candidate_outside_transformed_bounds)
+    with pytest.raises(RuntimeError, match="original bounds"):
+        solve([1], [], [], bounds=[(lower, upper)])
+
+
+def test_solve_rejects_an_objective_that_overflows_in_original_units():
+    with pytest.raises(RuntimeError, match="Numerical failure"):
+        solve([1e308], [[1]], [2], sense="max")
+
+
 def test_solve_drops_redundant_rows_and_pivots_out_zero_artificials():
     result = solve(
         [0, 1],

@@ -9,9 +9,15 @@ from numbers import Integral
 import numpy as np
 from numpy.typing import ArrayLike
 
+from ._numerics import (
+    FEASIBILITY_TOLERANCE,
+    ROUNDOFF_TOLERANCE,
+    scale_costs,
+    scale_rows,
+    verify_solution,
+)
 from ._result import SolverResult
 from ._utils import (
-    EPSILON,
     as_float_matrix,
     as_float_vector,
     build_tableau,
@@ -61,7 +67,8 @@ def solve(
     snapshots may be infeasible for the original constraints.
 
     Raises ValueError for invalid, infeasible, or unbounded problems and
-    RuntimeError when the pivot budget is exhausted.
+    RuntimeError when the pivot budget is exhausted or numerical accuracy
+    is insufficient to return a verified solution.
     """
     costs = as_float_vector(c, "c")
     rhs = as_float_vector(b, "b")
@@ -90,11 +97,13 @@ def solve(
     columns: list[int] = []
     signs: list[float] = []
     upper_limits: list[tuple[int, float]] = []
+    original_bounds: list[tuple[float, float]] = []
     for variable, (lower, upper) in enumerate(bounds):
         lower = -np.inf if lower is None else float(lower)
         upper = np.inf if upper is None else float(upper)
         if np.isnan(lower) or np.isnan(upper) or lower == np.inf or upper == -np.inf or lower > upper:
             raise ValueError(f"Invalid bounds for variable {variable}.")
+        original_bounds.append((lower, upper))
         if np.isfinite(lower):
             shift[variable] = lower
             if upper == lower:
@@ -109,7 +118,14 @@ def solve(
         columns.append(variable)
         signs.append(1.0 if np.isfinite(lower) else -1.0)
 
-    rhs -= constraints @ shift
+    original_constraints = constraints
+    original_rhs = rhs
+    original_relations = relations.copy()
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            rhs = rhs - constraints @ shift
+    except FloatingPointError as exc:
+        raise RuntimeError("Numerical failure while applying variable bounds.") from exc
     constraints = constraints[:, columns] * signs
     if upper_limits:
         bound_rows = np.zeros((len(upper_limits), len(columns)))
@@ -122,6 +138,14 @@ def solve(
     transformed_costs = costs[columns] * signs
     if sense == "max":
         transformed_costs = -transformed_costs
+    if not np.isfinite(rhs).all():
+        raise RuntimeError("Numerical failure: the transformed bounds or constraints are not finite.")
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            constraints, rhs = scale_rows(constraints, rhs)
+            transformed_costs = scale_costs(transformed_costs)
+    except FloatingPointError as exc:
+        raise RuntimeError("Numerical failure while scaling the linear program.") from exc
 
     def original_solution(values: np.ndarray) -> np.ndarray:
         solution = shift.copy()
@@ -146,8 +170,18 @@ def solve(
         constraints, rhs, relations, transformed_costs, max_iterations, trace,
     )
 
-    solution = original_solution(values)
-    return SolverResult(solution, float(costs @ solution), iterations)
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            solution = original_solution(values)
+            verify_solution(
+                original_constraints, original_rhs, original_relations, original_bounds, solution,
+            )
+            objective = float(costs @ solution)
+    except FloatingPointError as exc:
+        raise RuntimeError("Numerical failure while verifying the original solution.") from exc
+    if not np.isfinite(objective):
+        raise RuntimeError("Numerical failure: the original objective is not finite.")
+    return SolverResult(solution, objective, iterations)
 
 
 def _solve_standard_form(
@@ -176,21 +210,23 @@ def _solve_standard_form(
 
     phase_one_costs = np.zeros(variable_count)
     phase_one_costs[first_artificial:] = 1.0
-    tableau = build_tableau(phase_one_costs, standard, b)
-    tableau[0] -= phase_one_costs[basis] @ tableau[1:]
+    # Reduced costs are computed from the current basis in _minimize.
+    tableau = build_tableau(np.zeros(variable_count), standard, b)
     if trace is not None:
         trace(tableau, basis, 0, 1 if artificial_rows else 2, None, None)
-    tableau, iterations = _minimize(tableau, basis, 0, max_iterations, phase=1, trace=trace)
+    tableau, iterations = _minimize(
+        tableau, basis, phase_one_costs, 0, max_iterations, phase=1, trace=trace,
+    )
 
     artificial_basis = basis >= first_artificial
-    if np.sum(tableau[1:, -1][artificial_basis]) > EPSILON:
+    if np.sum(tableau[1:, -1][artificial_basis]) > FEASIBILITY_TOLERANCE:
         raise ValueError("The linear program is infeasible.")
 
     # Pivot zero-valued artificials out. If no real column can enter,
     # the row reduces to 0 = 0 once the artificial columns are removed.
     keep_rows = np.ones(basis.size, dtype=bool)
     for row in np.flatnonzero(artificial_basis):
-        candidates = np.abs(tableau[row + 1, :first_artificial]) > EPSILON
+        candidates = np.abs(tableau[row + 1, :first_artificial]) > ROUNDOFF_TOLERANCE
         candidates[basis[basis < first_artificial]] = False
         entering = np.flatnonzero(candidates)
         if entering.size == 0:
@@ -208,22 +244,29 @@ def _solve_standard_form(
 
     phase_two_costs = np.zeros(first_artificial)
     phase_two_costs[:costs.size] = costs
-    tableau[0, :-1] = phase_two_costs
-    tableau[0, -1] = 0.0
-    tableau[0] -= phase_two_costs[basis] @ tableau[1:]
     tableau, iterations = _minimize(
-        tableau, basis, iterations, max_iterations, phase=2, trace=trace,
+        tableau, basis, phase_two_costs, iterations, max_iterations, phase=2, trace=trace,
     )
     solution = extract_basic_solution(tableau, basis, zero_small=False)
     return solution[:costs.size], iterations
 
 
 def _minimize(
-    tableau: np.ndarray, basis: np.ndarray, iterations: int, max_iterations: int,
+    tableau: np.ndarray, basis: np.ndarray, costs: np.ndarray, iterations: int, max_iterations: int,
     *, phase: int, trace: _Trace | None,
 ) -> tuple[np.ndarray, int]:
     while True:
-        improving = tableau[0, :-1] < -EPSILON
+        basis_costs = costs[basis]
+        columns = tableau[1:, :-1]
+        try:
+            with np.errstate(over="raise", invalid="raise"):
+                reduced_costs = costs - basis_costs @ columns
+                # Measure roundoff against the terms in each reduced cost,
+                # so an unrelated large cost cannot hide a small improvement.
+                scale = np.maximum(np.abs(costs), np.abs(basis_costs) @ np.abs(columns))
+                improving = reduced_costs < -ROUNDOFF_TOLERANCE * scale
+        except FloatingPointError as exc:
+            raise RuntimeError("Numerical failure while computing reduced costs.") from exc
         improving[basis] = False
         entering = np.flatnonzero(improving)
         if entering.size == 0:
@@ -231,7 +274,13 @@ def _minimize(
 
         # Bland's rule uses the smallest variable index to break pivot ties.
         column = int(entering[0])
-        row = _get_leaving_row(tableau, column, basis=basis)
+        # A positive coefficient still limits the step even when the pivot
+        # itself would be too small to perform reliably.
+        try:
+            with np.errstate(over="raise", invalid="raise"):
+                row = _get_leaving_row(tableau, column, basis=basis, pivot_tolerance=0)
+        except FloatingPointError as exc:
+            raise RuntimeError("Numerical failure while selecting the leaving variable.") from exc
         tableau, iterations = _take_step(
             tableau, basis, row, column, iterations, max_iterations, phase=phase, trace=trace,
         )
@@ -243,7 +292,13 @@ def _take_step(
 ) -> tuple[np.ndarray, int]:
     if iterations >= max_iterations:
         raise RuntimeError("The simplex iteration limit was reached.")
-    tableau = pivot(tableau, row, column, zero_small=False)
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            tableau = pivot(
+                tableau, row, column, zero_small=False, pivot_tolerance=ROUNDOFF_TOLERANCE,
+            )
+    except (ValueError, FloatingPointError) as exc:
+        raise RuntimeError("Numerical failure: the selected pivot cannot be used reliably.") from exc
     leaving = int(basis[row - 1])
     basis[row - 1] = column
     iterations += 1

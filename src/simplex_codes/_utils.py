@@ -48,10 +48,13 @@ def build_tableau(
     return np.vstack([objective_row, constraints]).astype(float)
 
 
-def pivot(tableau: np.ndarray, row: int, column: int, *, zero_small: bool = True) -> np.ndarray:
+def pivot(
+    tableau: np.ndarray, row: int, column: int, *,
+    zero_small: bool = True, pivot_tolerance: float = EPSILON,
+) -> np.ndarray:
     updated = tableau.copy()
     pivot_value = updated[row, column]
-    if np.isclose(pivot_value, 0.0, atol=EPSILON):
+    if abs(pivot_value) <= pivot_tolerance:
         raise ValueError("Cannot pivot on a zero value.")
 
     updated[row] = updated[row] / pivot_value

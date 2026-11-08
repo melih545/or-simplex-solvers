@@ -87,11 +87,12 @@ def _get_pivot_position(tableau: np.ndarray, sense: str) -> tuple[int, int]:
 
 def _get_leaving_row(
     tableau: np.ndarray, pivot_column: int, *, basis: np.ndarray | None = None,
+    pivot_tolerance: float = EPSILON,
 ) -> int:
     column = tableau[1:, pivot_column]
     rhs = tableau[1:, -1]
     ratios = np.full_like(rhs, np.inf)
-    np.divide(rhs, column, out=ratios, where=column > EPSILON)
+    np.divide(rhs, column, out=ratios, where=column > pivot_tolerance)
     if np.isinf(ratios).all():
         raise ValueError("The linear program is unbounded for the current tableau.")
 
