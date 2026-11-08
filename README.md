@@ -82,6 +82,15 @@ pivots and `?chart=true` to request a chart for a two-variable model. Valid
 models return HTTP 200 with an explicit solve status, including mathematical
 and numerical failures. Invalid models return HTTP 422.
 
+### Capacity scenarios
+
+In the workbench, use **Kapasite karşılaştırması** to load the sample or
+upload a UTF-8 CSV. The first two columns are `product` and `profit`.
+Each remaining column names a resource and gives the quantity used by one
+unit of each product. Enter the baseline and alternative capacity for each
+resource. The comparison shows profit, production quantities, resource usage
+and binding constraints, and can be downloaded as JSON.
+
 ### Production planning and pivot visualization
 
 A workshop earns 8 units of profit per table and 5 per chair. Each product
@@ -219,6 +228,15 @@ python -m build --wheel
 
 CI builds and installs the wheel before running tests and examples on Python
 3.10 through 3.14.
+
+The browser workflow is tested on Python 3.12 in CI. To run it locally with
+the workbench dependencies installed, install the browser extra and Chromium.
+
+```bash
+python3 -m pip install -e ".[browser]"
+python3 -m playwright install chromium
+python3 -m pytest browser_tests
+```
 
 For an offline editable installation, install the required dependencies in
 advance and run the following command.

@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
 
 from ._charts import render_chart
+from ._scenarios import compare_scenarios, read_production_csv
 from ._service import SolveOutcome, execute_model
 from ._version import __version__
 
@@ -38,6 +39,17 @@ class ModelResponse(SolveOutcome):
     chart_message: str | None = None
 
 
+class ProductionCsv(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    csv: str = Field(max_length=32_768)
+
+
+class ScenarioRequest(ProductionCsv):
+    baseline: dict[str, FiniteFloat] = Field(max_length=30)
+    alternative: dict[str, FiniteFloat] = Field(max_length=30)
+
+
 app = FastAPI(title="Simplex Workbench API", version=__version__)
 
 
@@ -58,7 +70,7 @@ class ModelSizeLimit:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or scope["method"] != "POST" or scope["path"] != "/api/v1/solve":
+        if scope["type"] != "http" or scope["method"] != "POST" or not scope["path"].startswith("/api/v1/"):
             await self.app(scope, receive, send)
             return
         chunks = bytearray()
@@ -112,10 +124,29 @@ def solve_request(model: ModelRequest, response: Response, trace: bool = False, 
     return payload
 
 
+@app.post("/api/v1/scenarios/import")
+def import_production(data: ProductionCsv):
+    try:
+        products, resources, _, _ = read_production_csv(data.csv)
+    except ValueError as exc:
+        return JSONResponse({"status": "invalid_model", "error": str(exc)}, status_code=422)
+    return {"products": products, "resources": resources}
+
+
+@app.post("/api/v1/scenarios/compare")
+def compare_production(data: ScenarioRequest):
+    try:
+        return compare_scenarios(data.csv, data.baseline, data.alternative)
+    except ValueError as exc:
+        return JSONResponse({"status": "invalid_model", "error": str(exc)}, status_code=422)
+
+
 _ASSETS = {
     "/": ("index.html", "text/html"),
     "/app.css": ("app.css", "text/css"),
     "/app.js": ("app.js", "text/javascript"),
+    "/scenarios.js": ("scenarios.js", "text/javascript"),
+    "/capacity_example.csv": ("capacity_example.csv", "text/csv"),
 }
 
 

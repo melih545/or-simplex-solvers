@@ -30,6 +30,7 @@ simplex-app = "simplex_codes._app:main"
 
 [project.optional-dependencies]
 api = ["fastapi>=0.115", "pydantic>=2.10", "uvicorn>=0.32"]
+browser = ["playwright>=1.50"]
 compare = ["scipy>=1.10"]
 dev = ["build>=1.2", "httpx>=0.28", "pytest>=8"]
 viz = ["matplotlib>=3.8"]
@@ -48,7 +49,7 @@ version = { attr = "simplex_codes._version.__version__" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-simplex_codes = ["_web/*.html", "_web/*.css", "_web/*.js"]
+simplex_codes = ["_web/*.html", "_web/*.css", "_web/*.js", "_web/*.csv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

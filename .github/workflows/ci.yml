@@ -30,6 +30,13 @@ jobs:
       - name: Run the installed CLI
         run: |
           printf '%s\n' '{"c":[1],"A":[[1]],"b":[2],"sense":"max"}' | simplex-solve
+      - name: Run workbench browser tests
+        if: matrix.python-version == '3.12'
+        run: |
+          wheels=(dist/*.whl)
+          python -m pip install "${wheels[0]}[browser]"
+          python -m playwright install --with-deps chromium
+          python -m pytest browser_tests
       - name: Run installed-package examples
         working-directory: ${{ runner.temp }}
         env:

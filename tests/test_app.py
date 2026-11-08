@@ -82,3 +82,44 @@ def test_workbench_exposes_schema_and_limits_requests():
     assert "/api/v1/solve" in request("GET", "/openapi.json").json()["paths"]
     assert request("POST", "/api/v1/solve", json=MODEL | {"unexpected": True}).status_code == 422
     assert request("POST", "/api/v1/solve", content=b" " * 65_537).status_code == 413
+
+
+def test_capacity_comparison_reports_binding_constraints_and_profit_change():
+    source = request("GET", "/capacity_example.csv").text
+    imported = request("POST", "/api/v1/scenarios/import", json={"csv": source})
+    assert imported.json() == {"products": ["Masa", "Sandalye"], "resources": ["Depo", "İşçilik"]}
+    baseline = {"Depo": 6, "İşçilik": 45}
+    alternative = {"Depo": 7, "İşçilik": 54}
+    response = request("POST", "/api/v1/scenarios/compare", json={
+        "csv": source, "baseline": baseline, "alternative": alternative,
+    })
+    assert response.status_code == 200
+    report = response.json()
+    assert report["baseline"]["profit"] == pytest.approx(41.25)
+    assert report["alternative"]["products"] == pytest.approx({"Masa": 4.75, "Sandalye": 2.25})
+    assert report["profit_delta"] == pytest.approx(8)
+    assert all(resource["active"] for resource in report["baseline"]["resources"])
+
+
+def test_capacity_import_reports_invalid_row_number():
+    response = request("POST", "/api/v1/scenarios/import", json={"csv": "product,profit,steel\na,2,bad\n"})
+    assert response.status_code == 422
+    assert "line 2" in response.json()["error"]
+
+
+def test_capacity_comparison_reports_unused_resources_and_unbounded_profit():
+    response = request("POST", "/api/v1/scenarios/compare", json={
+        "csv": "product,profit,steel,labor\na,2,1,0\n",
+        "baseline": {"steel": 4, "labor": 10},
+        "alternative": {"steel": 8, "labor": 20},
+    })
+    report = response.json()
+    assert report["baseline"]["resources"][1]["slack"] == 10
+    assert not report["baseline"]["resources"][1]["active"]
+    unbounded = request("POST", "/api/v1/scenarios/compare", json={
+        "csv": "product,profit,steel\na,2,0\n",
+        "baseline": {"steel": 4},
+        "alternative": {"steel": 8},
+    }).json()
+    assert unbounded["baseline"]["status"] == "unbounded"
+    assert "profit_delta" not in unbounded

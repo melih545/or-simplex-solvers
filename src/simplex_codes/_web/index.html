@@ -6,6 +6,7 @@
   <title>Simplex Workbench</title>
   <link rel="stylesheet" href="/app.css">
   <script src="/app.js" defer></script>
+  <script src="/scenarios.js" defer></script>
 </head>
 <body>
   <header class="masthead">
@@ -70,6 +71,33 @@
             <tbody id="steps"></tbody>
           </table>
         </div>
+      </div>
+    </section>
+    <section class="panel scenario-panel" aria-labelledby="scenario-heading">
+      <header class="panel-head">
+        <div><p class="eyebrow">03 · SENARYO</p><h2 id="scenario-heading">Kapasite karşılaştırması</h2></div>
+        <button id="scenario-example" class="secondary" type="button">Kapasite örneğini yükle</button>
+      </header>
+      <form id="scenario-form">
+        <label for="production-csv">Üretim verisi (CSV)</label>
+        <input type="file" id="production-csv" accept=".csv,text/csv">
+        <p class="help">İlk sütunlar <code>product</code> ve <code>profit</code> olmalı. Sonraki sütunlara bir ürünün tükettiği kaynak miktarlarını gir.</p>
+        <p id="scenario-source" class="help" role="status"></p>
+        <div id="scenario-capacities" class="table-scroll" hidden>
+          <table aria-label="Senaryo kapasiteleri">
+            <thead><tr><th>Kaynak</th><th>Temel kapasite</th><th>Alternatif kapasite</th></tr></thead>
+            <tbody id="capacity-rows"></tbody>
+          </table>
+        </div>
+        <div class="scenario-actions">
+          <button id="compare" class="primary" type="submit" disabled>Senaryoları karşılaştır</button>
+          <button id="export-comparison" class="secondary" type="button" disabled>Sonucu JSON indir</button>
+        </div>
+        <p id="scenario-error" class="error" role="alert" hidden></p>
+      </form>
+      <div id="scenario-result" hidden>
+        <p id="profit-delta" class="profit-delta" role="status"></p>
+        <div id="scenario-reports" class="scenario-reports"></div>
       </div>
     </section>
   </main>
